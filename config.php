@@ -1,19 +1,16 @@
 <?php
-// ===== SET TIMEZONE FIRST =====
 date_default_timezone_set('Africa/Nairobi');
 
-$password = "";
-$username = "root";
-$database = "geoqr";
-//$port = "3306";
-$host = "localhost";
+$host = getenv('DB_HOST') ?: 'localhost';
+$username = getenv('DB_USER') ?: 'root';
+$password = getenv('DB_PASS') ?: '';
+$database = getenv('DB_NAME') ?: 'geoqr';
+$port = getenv('DB_PORT') ?: '3306';
 
-$conn = mysqli_connect($host, $username, $password, $database);
-
+$conn = mysqli_connect($host, $username, $password, $database, $port);
 if (!$conn) {
     die("Connection failed: " . mysqli_connect_error());
 }
 
-// ===== SET MySQL TIMEZONE =====
 $conn->query("SET time_zone = '+03:00'");
 ?>
