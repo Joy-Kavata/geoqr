@@ -29,10 +29,6 @@ if ($result-> num_rows > 0) {
 
 $first_name = explode(" ", $user['full_name'])[0];
 
-
-// =============================================
-// 1. CREATE GEOFENCE
-// =============================================
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['create_geofence'])) {
     $name = $_POST['name'];
     $latitude = $_POST['latitude'];
@@ -50,10 +46,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['create_geofence'])) {
     exit();
 }
 
-
-// =============================================
-// 2. DELETE GEOFENCE
-// =============================================
 if (isset($_GET['delete_id'])) {
     $delete_id = $_GET['delete_id'];
     
@@ -84,10 +76,6 @@ if (isset($_GET['delete_id'])) {
     exit();
 }
 
-
-// =============================================
-// 3. UPDATE GEOFENCE (EDIT)
-// =============================================
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_geofence'])) {
     $geofence_id = $_POST['geofence_id'];
     $name = $_POST['name'];
@@ -112,10 +100,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_geofence'])) {
     exit();
 }
 
-
-// =============================================
-// 4. ENROLL STUDENT IN UNIT
-// =============================================
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['enroll_student'])) {
     $user_id = $_POST['user_id'];
     $unit_id = $_POST['unit_id'];
@@ -147,10 +131,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['enroll_student'])) {
     exit();
 }
 
-
-// =============================================
-// 5. REMOVE STUDENT FROM UNIT (UN-ENROLL)
-// =============================================
 if (isset($_GET['remove_enrollment'])) {
     $user_id = $_GET['user_id'];
     $unit_id = $_GET['unit_id'];
@@ -170,21 +150,11 @@ if (isset($_GET['remove_enrollment'])) {
     exit();
 }
 
-
-// =============================================
-// FETCH DATA FOR DISPLAY
-// =============================================
-
-// 1. Get all geofences with unit names
 $geofences = $conn->query("SELECT g.*, u.unit_name FROM geofences g LEFT JOIN units u ON g.unit_id = u.unit_id");
 
-// 2. Get all units for dropdowns
+
 $units = $conn->query("SELECT unit_id, unit_name, unit_code FROM units ORDER BY unit_name ASC");
-
-// 3. Get all students (users with role_id = 1) for enrollment dropdown
 $students = $conn->query("SELECT user_id, full_name, email FROM users WHERE role_id = 1 ORDER BY full_name ASC");
-
-// 4. Get all enrollments with student and unit details
 $enrollments_query = "SELECT e.enrollment_id, e.user_id, e.unit_id, e.enrolled_at,
                       u.full_name as student_name, u.email as student_email,
                       un.unit_name, un.unit_code
@@ -194,7 +164,6 @@ $enrollments_query = "SELECT e.enrollment_id, e.user_id, e.unit_id, e.enrolled_a
                       ORDER BY un.unit_name ASC, u.full_name ASC";
 $enrollments = $conn->query($enrollments_query);
 
-// 5. Get enrollment counts per unit
 $enrollment_counts_query = "SELECT un.unit_id, un.unit_name, un.unit_code, 
                             COUNT(e.user_id) as student_count
                             FROM units un
@@ -203,12 +172,10 @@ $enrollment_counts_query = "SELECT un.unit_id, un.unit_name, un.unit_code,
                             ORDER BY un.unit_name ASC";
 $enrollment_counts = $conn->query($enrollment_counts_query);
 
-// 6. Get total counts for stats
 $total_students = $conn->query("SELECT COUNT(*) as count FROM users WHERE role_id = 1")->fetch_assoc()['count'];
 $total_units = $conn->query("SELECT COUNT(*) as count FROM units")->fetch_assoc()['count'];
 $total_enrollments = $conn->query("SELECT COUNT(*) as count FROM enrollment")->fetch_assoc()['count'];
 
-// 7. Get geofence data for editing (if edit_id is set)
 $edit_geofence = null;
 if (isset($_GET['edit_id'])) {
     $edit_id = $_GET['edit_id'];
@@ -223,10 +190,8 @@ if (isset($_GET['edit_id'])) {
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Admin Dashboard - GeoQR | KCA University</title>
+    <title>Admin Dashboard - GeoQR</title>
     <style>
-        /* ===== KCA UNIVERSITY THEME ===== */
-        /* Colors: Navy Blue (#1A2A4A), Gold (#C9A84C), White (#FFFFFF) */
         
         * { margin: 0; padding: 0; box-sizing: border-box; }
         
@@ -241,7 +206,6 @@ if (isset($_GET['edit_id'])) {
             margin: 0 auto; 
         }
         
-        /* ===== HEADER ===== */
         .header { 
             background: linear-gradient(135deg, #1A2A4A 0%, #2C3E6A 100%);
             color: #FFFFFF; 
@@ -331,7 +295,6 @@ if (isset($_GET['edit_id'])) {
             border-left: 4px solid #dc3545;
         }
         
-        /* ===== STATS GRID ===== */
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
@@ -365,7 +328,6 @@ if (isset($_GET['edit_id'])) {
             margin-top: 5px;
         }
         
-        /* ===== THREE COLUMN LAYOUT ===== */
         .three-col { 
             display: grid; 
             grid-template-columns: 1fr 1fr 1fr; 
@@ -384,7 +346,6 @@ if (isset($_GET['edit_id'])) {
             } 
         }
         
-        /* ===== CARDS ===== */
         .card { 
             background: #FFFFFF; 
             padding: 25px; 
@@ -420,7 +381,6 @@ if (isset($_GET['edit_id'])) {
             font-weight: 600;
         }
         
-        /* ===== FORM ELEMENTS ===== */
         input, select { 
             width: 100%; 
             padding: 12px 15px; 
@@ -440,7 +400,6 @@ if (isset($_GET['edit_id'])) {
             box-shadow: 0 0 0 3px rgba(201, 168, 76, 0.15);
         }
         
-        /* ===== BUTTONS ===== */
         .btn { 
             background: #1A2A4A; 
             color: #FFFFFF; 
@@ -489,7 +448,6 @@ if (isset($_GET['edit_id'])) {
             width: auto;
         }
         
-        /* ===== TABLES ===== */
         table { 
             width: 100%; 
             border-collapse: collapse; 
@@ -513,7 +471,6 @@ if (isset($_GET['edit_id'])) {
             background: #f8f9fa; 
         }
         
-        /* ===== DELETE LINK ===== */
         .delete-link { 
             color: #dc3545; 
             text-decoration: none; 
@@ -532,7 +489,6 @@ if (isset($_GET['edit_id'])) {
             text-decoration: none;
         }
         
-        /* ===== EDIT LINK ===== */
         .edit-link {
             color: #1A2A4A;
             text-decoration: none;
@@ -551,7 +507,6 @@ if (isset($_GET['edit_id'])) {
             text-decoration: none;
         }
         
-        /* ===== REMOVE LINK ===== */
         .remove-link {
             color: #dc3545;
             text-decoration: none;
@@ -570,7 +525,6 @@ if (isset($_GET['edit_id'])) {
             text-decoration: none;
         }
         
-        /* ===== NO DATA ===== */
         .no-data { 
             color: #95a5a6; 
             text-align: center; 
@@ -578,7 +532,6 @@ if (isset($_GET['edit_id'])) {
             font-style: italic;
         }
         
-        /* ===== ENROLLMENT COUNT BADGE ===== */
         .count-badge {
             background: #1A2A4A;
             color: #FFFFFF;
@@ -593,7 +546,6 @@ if (isset($_GET['edit_id'])) {
             color: #1A2A4A;
         }
         
-        /* ===== TWO COLUMN ===== */
         .two-col {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -606,7 +558,6 @@ if (isset($_GET['edit_id'])) {
             }
         }
         
-        /* ===== FOOTER ===== */
         .footer {
             margin-top: 30px;
             text-align: center;
@@ -624,8 +575,7 @@ if (isset($_GET['edit_id'])) {
         .footer .gold {
             color: #C9A84C;
         }
-        
-        /* ===== RESPONSIVE ===== */
+
         @media (max-width: 768px) {
             .header {
                 flex-direction: column;
@@ -639,7 +589,6 @@ if (isset($_GET['edit_id'])) {
             .header h1 { font-size: 20px; }
         }
         
-        /* ===== STUDENT ID STYLE ===== */
         .student-id {
             font-size: 11px;
             color: #95a5a6;
@@ -662,7 +611,6 @@ if (isset($_GET['edit_id'])) {
             display: block;
         }
         
-        /* ===== EDIT FORM ===== */
         .edit-form {
             background: #f8f9fa;
             padding: 20px;
@@ -730,7 +678,6 @@ if (isset($_GET['edit_id'])) {
 <body>
 <div class="container">
     
-    <!-- ===== HEADER ===== -->
     <div class="header">
         <div class="header-left">
             <div class="header-logo">
@@ -747,7 +694,6 @@ if (isset($_GET['edit_id'])) {
         <a href="logout.php" class="logout-btn">Logout</a>
     </div>
     
-    <!-- ===== STATS ===== -->
     <div class="stats-grid">
         <div class="stat-card">
             <div class="number"><?php echo $total_students; ?></div>
@@ -767,16 +713,12 @@ if (isset($_GET['edit_id'])) {
         </div>
     </div>
     
-    <!-- ===== MESSAGES ===== -->
     <?php if ($message): ?>
         <div class="message <?php echo $message_type; ?>">
             <?php echo $message; ?>
         </div>
     <?php endif; ?>
     
-    <!-- ================================================== -->
-    <!-- EDIT GEOFENCE FORM (shown when edit_id is set)      -->
-    <!-- ================================================== -->
     <?php if ($edit_geofence): ?>
         <div class="card">
             <div class="edit-form">
@@ -805,7 +747,7 @@ if (isset($_GET['edit_id'])) {
                     <select name="unit_id" required>
                         <option value="">Select Unit</option>
                         <?php 
-                        // Reset units result set
+                     
                         $units->data_seek(0);
                         while ($unit = $units->fetch_assoc()): 
                             $selected = ($unit['unit_id'] == $edit_geofence['unit_id']) ? 'selected' : '';
@@ -825,14 +767,8 @@ if (isset($_GET['edit_id'])) {
         </div>
     <?php endif; ?>
     
-    <!-- ================================================== -->
-    <!-- THREE COLUMN LAYOUT: GEOFENCE + ENROLLMENT + UNITS -->
-    <!-- ================================================== -->
     <div class="three-col">
         
-        <!-- ============================================= -->
-        <!-- COLUMN 1: CREATE GEOFENCE                      -->
-        <!-- ============================================= -->
         <div class="card">
             <h2>Create Geofence</h2>
             <form method="post">
@@ -843,7 +779,6 @@ if (isset($_GET['edit_id'])) {
                 <select name="unit_id" required>
                     <option value="">Select Unit</option>
                     <?php 
-                    // Reset units result set
                     $units->data_seek(0);
                     while ($unit = $units->fetch_assoc()): 
                     ?>
@@ -856,19 +791,14 @@ if (isset($_GET['edit_id'])) {
             </form>
         </div>
         
-        <!-- ============================================= -->
-        <!-- COLUMN 2: ENROLL STUDENT                       -->
-        <!-- ============================================= -->
         <div class="card">
             <h2>Enroll Student</h2>
             
-            <!-- Enrollment Form -->
             <form method="post">
-                <!-- Dropdown: Select Student (shows ID + Name) -->
                 <select name="user_id" required>
                     <option value="">Select Student</option>
                     <?php 
-                    // Reset students result set
+
                     $students->data_seek(0);
                     while ($student = $students->fetch_assoc()): 
                     ?>
@@ -878,11 +808,10 @@ if (isset($_GET['edit_id'])) {
                     <?php endwhile; ?>
                 </select>
                 
-                <!-- Dropdown: Select Unit (shows ID + Name) -->
                 <select name="unit_id" required>
                     <option value="">Select Unit</option>
                     <?php 
-                    // Reset the units result set
+
                     $units->data_seek(0);
                     while ($unit = $units->fetch_assoc()): 
                     ?>
@@ -894,10 +823,7 @@ if (isset($_GET['edit_id'])) {
                 
                 <button type="submit" name="enroll_student" class="btn btn-success">Enroll Student</button>
             </form>
-            
-            <!-- ============================================= -->
-            <!-- ENROLLMENT COUNTS PER UNIT                    -->
-            <!-- ============================================= -->
+
             <h3 style="margin-top: 20px; color: #1A2A4A; font-size: 16px;">Enrollment Counts</h3>
             <?php if ($enrollment_counts->num_rows > 0): ?>
                 <?php while ($ec = $enrollment_counts->fetch_assoc()): ?>
@@ -915,9 +841,6 @@ if (isset($_GET['edit_id'])) {
             <?php endif; ?>
         </div>
         
-        <!-- ============================================= -->
-        <!-- COLUMN 3: ENROLLED STUDENTS LIST              -->
-        <!-- ============================================= -->
         <div class="card">
             <h2>Enrolled Students</h2>
             
@@ -962,14 +885,8 @@ if (isset($_GET['edit_id'])) {
         
     </div>
     
-    <!-- ================================================== -->
-    <!-- TWO COLUMN LAYOUT: GEOFENCES + RECENT ENROLLMENTS  -->
-    <!-- ================================================== -->
     <div class="two-col">
         
-        <!-- ============================================= -->
-        <!-- EXISTING GEOFENCES                             -->
-        <!-- ============================================= -->
         <div class="card">
             <h2>Existing Geofences <span class="badge"><?php echo $geofences->num_rows; ?></span></h2>
             <?php if ($geofences->num_rows > 0): ?>
@@ -1001,9 +918,6 @@ if (isset($_GET['edit_id'])) {
             <?php endif; ?>
         </div>
         
-        <!-- ============================================= -->
-        <!-- RECENT ENROLLMENTS                             -->
-        <!-- ============================================= -->
         <div class="card">
             <h2>Recent Enrollments</h2>
             <?php 
@@ -1013,7 +927,7 @@ if (isset($_GET['edit_id'])) {
             while ($row = $enrollments->fetch_assoc()) {
                 $enrollments_list[] = $row;
             }
-            // Get only first 10 most recent
+
             $recent_enrollments = array_slice($enrollments_list, 0, 10);
             ?>
             <?php if (count($recent_enrollments) > 0): ?>

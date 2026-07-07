@@ -14,12 +14,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $error = "Please input all required fields!";
     } elseif ($pass !== $conf_pass) {
         $error = "Passwords do not match!";
-    //} elseif (strlen($pass) < 8) {
-        //$error = "Password must be at least 8 characters!";
+   
     } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $error = "Invalid email format!";
     } else {
-        // Check if email already exists
         $check_email = $conn->prepare("SELECT user_id FROM users WHERE email = ?");
         $check_email->bind_param("s", $email);
         $check_email->execute();
@@ -28,7 +26,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         if ($check_email->num_rows > 0) {
             $error = "Email already exists! Please use a different email.";
         } else {
-            $role_id = 1; // Default role: student
+            $role_id = 1;
             $password_hash = password_hash($pass, PASSWORD_DEFAULT);
 
             $stmt = $conn->prepare("INSERT INTO users (full_name, email, password_hash, role_id) VALUES (?, ?, ?, ?)");
@@ -54,8 +52,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sign Up - GeoQR | KCA University</title>
     <style>
-        /* ===== KCA UNIVERSITY THEME ===== */
-        /* Colors: Navy Blue (#1A2A4A), Gold (#C9A84C), White (#FFFFFF) */
         
         * { margin: 0; padding: 0; box-sizing: border-box; }
         
@@ -69,7 +65,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             padding: 20px;
         }
         
-        /* ===== SIGNUP CONTAINER ===== */
         .signup-container {
             background: #FFFFFF;
             border-radius: 16px;
@@ -92,7 +87,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             }
         }
         
-        /* ===== HEADER ===== */
         .signup-header {
             text-align: center;
             margin-bottom: 30px;
@@ -134,7 +128,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             margin-top: 5px;
         }
         
-        /* ===== MESSAGES ===== */
         .error-message {
             background: #f8d7da;
             color: #721c24;
@@ -167,7 +160,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             text-decoration: underline;
         }
         
-        /* ===== FORM ===== */
         .form-group {
             margin-bottom: 18px;
         }
@@ -215,7 +207,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             color: #b0b0b0;
         }
         
-        /* ===== SIGNUP BUTTON ===== */
         .signup-btn {
             width: 100%;
             padding: 14px;
@@ -243,7 +234,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             transform: translateY(0);
         }
         
-        /* ===== FOOTER ===== */
         .signup-footer {
             text-align: center;
             margin-top: 20px;
@@ -283,7 +273,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             color: #C9A84C;
         }
         
-        /* ===== PASSWORD HINT ===== */
         .password-hint {
             font-size: 12px;
             color: #95a5a6;
@@ -291,7 +280,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             margin-bottom: 10px;
         }
         
-        /* ===== RESPONSIVE ===== */
         @media (max-width: 480px) {
             .signup-container {
                 padding: 30px 20px;
@@ -317,7 +305,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
 <div class="signup-container">
     
-    <!-- ===== HEADER ===== -->
     <div class="signup-header">
         <span class="logo-icon">🎓</span>
         <div class="uni-name">KCA <span class="gold">UNIVERSITY</span></div>
@@ -325,19 +312,16 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         <div class="subtitle">Create Your Account</div>
     </div>
     
-    <!-- ===== ERROR MESSAGE ===== -->
     <?php if ($error): ?>
         <div class="error-message" style="display: <?php echo $error ? 'block' : 'none'; ?>;">
             <?php echo $error; ?>
         </div>
     <?php endif; ?>
 
-    <!-- ===== SUCCESS MESSAGE ===== -->
     <?php if ($success): ?>
         <div class="success-message"><?php echo $success; ?></div>
     <?php endif; ?>
     
-    <!-- ===== SIGNUP FORM ===== -->
     <form action="signup_form.php" method="post">
         
         <div class="form-group">
@@ -377,7 +361,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         
     </form>
     
-    <!-- ===== FOOTER ===== -->
     <div class="signup-footer">
         <p>Already have an account? <a href="login_form.php">Login here</a></p>
         <!--<div class="uni-footer">

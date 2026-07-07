@@ -1,11 +1,9 @@
 <?php
-// ===== SET TIMEZONE =====
 date_default_timezone_set('Africa/Nairobi');
 
 session_start();
 include 'config.php';
 
-// Check if user is lecturer
 if (!isset($_SESSION['user_id']) || $_SESSION['role_id'] != 2) {
     header("Location: login_form.php");
     exit();
@@ -14,7 +12,6 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role_id'] != 2) {
 $lecturer_id = $_SESSION['user_id'];
 $unit_id = isset($_GET['unit_id']) ? $_GET['unit_id'] : 0;
 
-// Get the unit name
 $unit_query = "SELECT unit_name FROM units WHERE user_id = ? AND unit_id = ?";
 $stmt = $conn->prepare($unit_query);
 $stmt->bind_param("ii", $lecturer_id, $unit_id);
@@ -27,7 +24,6 @@ if ($unit_result->num_rows == 0) {
 $unit = $unit_result->fetch_assoc();
 $unit_name = $unit['unit_name'];
 
-// Get geofences for this lecturer's units
 $geofences_query = "SELECT g.geofence_id, g.name, u.unit_name 
                     FROM geofences g 
                     JOIN units u ON g.unit_id = u.unit_id 
@@ -46,10 +42,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $start_time = $_POST['start_time'];
     $duration = $_POST['duration'];
     
-    // Calculate end time using PHP (NOT MySQL)
     $end_time = date('Y-m-d H:i:s', strtotime($start_time . ' + ' . $duration . ' minutes'));
     
-    // Debug - check the times
     error_log("Start time: " . $start_time);
     error_log("End time: " . $end_time);
     error_log("Current PHP time: " . date('Y-m-d H:i:s'));
@@ -58,14 +52,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $stmt->bind_param("iissi", $unit_id, $geofence_id, $start_time, $end_time, $lecturer_id);
     
     if ($stmt->execute()) {
-        // ============================================================
-        // Get the newly created session ID and redirect to QR code page
-        // ============================================================
+      
         $session_id = $stmt->insert_id;
         $_SESSION['message'] = "Attendance session created successfully!";
         $_SESSION['message_type'] = "success";
         
-        // Redirect to QR code page
         header("Location: generate_qr.php?session_id=" . $session_id);
         exit();
     } else {
@@ -77,7 +68,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $stmt->close();
 }
 
-// Get messages
 $message = isset($_SESSION['message']) ? $_SESSION['message'] : '';
 $message_type = isset($_SESSION['message_type']) ? $_SESSION['message_type'] : '';
 unset($_SESSION['message']);
@@ -88,7 +78,6 @@ unset($_SESSION['message_type']);
 <head>
     <title>Create Attendance Session - GeoQR | KCA University</title>
     <style>
-        /* ===== KCA UNIVERSITY THEME ===== */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         
         body { 
@@ -113,7 +102,6 @@ unset($_SESSION['message_type']);
             to { opacity: 1; transform: translateY(0); }
         }
         
-        /* ===== HEADER ===== */
         .header {
             display: flex;
             justify-content: space-between;
@@ -143,7 +131,6 @@ unset($_SESSION['message_type']);
             font-size: 32px;
         }
         
-        /* ===== UNIT NAME ===== */
         .unit-name {
             background: #f8f9fa;
             padding: 12px 16px;
@@ -157,7 +144,6 @@ unset($_SESSION['message_type']);
             font-size: 18px;
         }
         
-        /* ===== INFO BOX ===== */
         .info-box {
             background: #e8f4fd;
             padding: 12px 16px;
@@ -168,7 +154,6 @@ unset($_SESSION['message_type']);
             color: #2c3e50;
         }
         
-        /* ===== MESSAGES ===== */
         .message { 
             padding: 14px 18px; 
             border-radius: 8px; 
@@ -188,7 +173,6 @@ unset($_SESSION['message_type']);
             border-left: 4px solid #dc3545;
         }
         
-        /* ===== FORM ===== */
         .form-group {
             margin-bottom: 18px;
         }
@@ -231,7 +215,6 @@ unset($_SESSION['message_type']);
             margin-top: 5px;
         }
         
-        /* ===== CURRENT TIME DISPLAY ===== */
         .current-time {
             text-align: center;
             padding: 10px;
@@ -246,7 +229,6 @@ unset($_SESSION['message_type']);
             color: #1A2A4A;
         }
         
-        /* ===== BUTTONS ===== */
         .btn { 
             background: #1A2A4A; 
             color: #FFFFFF; 
@@ -294,7 +276,6 @@ unset($_SESSION['message_type']);
             text-decoration: underline; 
         }
         
-        /* ===== RESPONSIVE ===== */
         @media (max-width: 480px) {
             .container { padding: 25px 20px; }
             .header h1 { font-size: 20px; }
@@ -304,7 +285,6 @@ unset($_SESSION['message_type']);
 <body>
 <div class="container">
     
-    <!-- ===== HEADER ===== -->
     <div class="header">
         <div>
             <h1><span>Start</span> Attendance</h1>
@@ -313,17 +293,14 @@ unset($_SESSION['message_type']);
         <span class="logo">🎓</span>
     </div>
     
-    <!-- ===== UNIT NAME ===== -->
     <div class="unit-name">
         <strong><?php echo htmlspecialchars($unit_name); ?></strong>
     </div>
     
-    <!-- ===== CURRENT TIME ===== -->
     <div class="current-time">
         Current server time: <strong><?php echo date('Y-m-d H:i:s'); ?></strong>
     </div>
     
-    <!-- ===== INFO BOX ===== -->
     <div class="info-box">
         Create an attendance session for your class. 
         Students will scan the QR code to mark attendance.
@@ -331,18 +308,16 @@ unset($_SESSION['message_type']);
         <strong>Tip:</strong> After creating the session, you will be shown a QR code to display to your students.
     </div>
     
-    <!-- ===== MESSAGES ===== -->
     <?php if ($message): ?>
         <div class="message <?php echo $message_type; ?>">
             <?php echo $message; ?>
         </div>
     <?php endif; ?>
     
-    <!-- ===== FORM ===== -->
+
     <form method="post">
         <input type="hidden" name="unit_id" value="<?php echo $unit_id; ?>">
         
-        <!-- Geofence Selection -->
         <div class="form-group">
             <label>Select Geofence (Location)</label>
             <select name="geofence_id">
@@ -356,7 +331,6 @@ unset($_SESSION['message_type']);
             <div class="hint">Students must be within this location to check in.</div>
         </div>
         
-        <!-- Start Time -->
         <div class="form-group">
             <label>Start Time <span class="required">*</span></label>
             <input type="datetime-local" name="start_time" required
@@ -364,18 +338,15 @@ unset($_SESSION['message_type']);
             <div class="hint">When should the attendance session start?</div>
         </div>
         
-        <!-- Duration -->
         <div class="form-group">
             <label>Duration (minutes) <span class="required">*</span></label>
             <input type="number" name="duration" value="60" min="5" max="180" required>
             <div class="hint">How long should the attendance session last? (5 - 180 minutes)</div>
         </div>
         
-        <!-- Submit Button -->
         <button type="submit" class="btn btn-success">Create Session</button>
     </form>
     
-    <!-- ===== BACK LINK ===== -->
     <a href="lecturer_dashboard.php" class="back">Back to Dashboard</a>
     
 </div>

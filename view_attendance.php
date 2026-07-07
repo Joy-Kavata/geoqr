@@ -2,7 +2,6 @@
 session_start();
 include 'config.php';
 
-// Check if user is lecturer
 if (!isset($_SESSION['user_id']) || $_SESSION['role_id'] != 2) {
     header("Location: login_form.php");
     exit();
@@ -12,7 +11,6 @@ $lecturer_id = $_SESSION['user_id'];
 $unit_id = isset($_GET['unit_id']) ? $_GET['unit_id'] : 0;
 $session_id = isset($_GET['session_id']) ? $_GET['session_id'] : null;
 
-// Get the unit name
 $unit_query = "SELECT unit_name FROM units WHERE user_id = ? AND unit_id = ?";
 $stmt = $conn->prepare($unit_query);
 $stmt->bind_param("ii", $lecturer_id, $unit_id);
@@ -25,9 +23,7 @@ if ($unit_result->num_rows == 0) {
 $unit = $unit_result->fetch_assoc();
 $unit_name = $unit['unit_name'];
 
-// If a session is selected, show attendance details
 if ($session_id) {
-    // Get session details
     $session_query = "SELECT s.session_id, s.start_time, s.end_time, g.name as geofence_name,
                       (SELECT COUNT(*) FROM attendance_logs WHERE session_id = s.session_id) as total_present
                       FROM attendance_sessions s
@@ -43,9 +39,6 @@ if ($session_id) {
     }
     $session = $session_result->fetch_assoc();
     
-    // ============================================================
-    // GET ALL ENROLLED STUDENTS FOR THIS UNIT
-    // ============================================================
     $all_students_query = "SELECT u.user_id, u.full_name, u.email
                            FROM users u
                            JOIN enrollment e ON u.user_id = e.user_id
@@ -57,9 +50,6 @@ if ($session_id) {
     $all_students = $stmt->get_result();
     $total_enrolled = $all_students->num_rows;
     
-    // ============================================================
-    // GET STUDENTS WHO ATTENDED (PRESENT)
-    // ============================================================
     $present_query = "SELECT u.user_id, u.full_name, u.email, al.check_in_time, al.status
                       FROM attendance_logs al
                       JOIN users u ON al.user_id = u.user_id
@@ -70,20 +60,13 @@ if ($session_id) {
     $stmt->execute();
     $present_students = $stmt->get_result();
     
-    // ============================================================
-    // CREATE ARRAY OF PRESENT STUDENT IDs
-    // ============================================================
     $present_ids = [];
     while ($p = $present_students->fetch_assoc()) {
         $present_ids[] = $p['user_id'];
     }
     
-    // Reset the present_students result set for display
     $present_students->data_seek(0);
     
-    // ============================================================
-    // GET STUDENTS WHO WERE ABSENT (Enrolled but not present)
-    // ============================================================
     $absent_students = [];
     $all_students->data_seek(0);
     while ($student = $all_students->fetch_assoc()) {
@@ -96,7 +79,6 @@ if ($session_id) {
     $attendance_percentage = $total_enrolled > 0 ? round(($total_present / $total_enrolled) * 100) : 0;
 
 } else {
-    // Get all sessions for this unit
     $sessions_query = "SELECT s.session_id, s.start_time, s.end_time, g.name as geofence_name,
                        (SELECT COUNT(*) FROM attendance_logs WHERE session_id = s.session_id) as attendance_count
                        FROM attendance_sessions s
@@ -117,7 +99,6 @@ $conn->close();
 <head>
     <title>View Attendance - <?php echo htmlspecialchars($unit_name); ?></title>
     <style>
-        /* ===== KCA UNIVERSITY THEME ===== */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         
         body { 
@@ -131,7 +112,6 @@ $conn->close();
             margin: 0 auto; 
         }
         
-        /* ===== HEADER ===== */
         .header { 
             background: linear-gradient(135deg, #1A2A4A 0%, #2C3E6A 100%);
             color: #FFFFFF; 
@@ -180,7 +160,6 @@ $conn->close();
             border-color: #C9A84C;
         }
         
-        /* ===== CARDS ===== */
         .card { 
             background: #FFFFFF; 
             border-radius: 12px; 
@@ -198,7 +177,6 @@ $conn->close();
             font-size: 18px;
         }
         
-        /* ===== STATS GRID ===== */
         .stats-grid { 
             display: grid; 
             grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); 
@@ -230,7 +208,6 @@ $conn->close();
             margin-top: 3px;
         }
         
-        /* ===== TABLES ===== */
         table { 
             width: 100%; 
             border-collapse: collapse; 
@@ -254,12 +231,10 @@ $conn->close();
             background: #f8f9fa; 
         }
         
-        /* ===== STATUS ===== */
         .status-present { color: #27ae60; font-weight: 600; }
         .status-absent { color: #e74c3c; font-weight: 600; }
         .status-late { color: #f39c12; font-weight: 600; }
         
-        /* ===== BADGES ===== */
         .badge-present { 
             background: #27ae60; 
             color: white; 
@@ -282,7 +257,6 @@ $conn->close();
             margin-left: 8px;
         }
         
-        /* ===== BUTTONS ===== */
         .btn { 
             display: inline-block; 
             padding: 8px 20px; 
@@ -340,7 +314,6 @@ $conn->close();
             transform: translateY(-2px);
         }
         
-        /* ===== SESSION ITEMS ===== */
         .session-item { 
             padding: 12px 15px; 
             border-bottom: 1px solid #ecf0f1; 
@@ -371,7 +344,6 @@ $conn->close();
             flex-wrap: wrap;
         }
         
-        /* ===== NO DATA ===== */
         .no-data { 
             color: #95a5a6; 
             text-align: center; 
@@ -379,7 +351,6 @@ $conn->close();
             font-style: italic;
         }
         
-        /* ===== TWO COLUMN LAYOUT ===== */
         .two-col { 
             display: grid; 
             grid-template-columns: 1fr 1fr; 
@@ -392,7 +363,6 @@ $conn->close();
             } 
         }
         
-        /* ===== BACK LINK ===== */
         .back-link { 
             display: inline-block; 
             margin-top: 15px; 
@@ -407,7 +377,6 @@ $conn->close();
             text-decoration: underline; 
         }
         
-        /* ===== SUMMARY INFO ===== */
         .summary-info {
             background: #f8f9fa;
             padding: 12px 18px;
@@ -422,7 +391,6 @@ $conn->close();
             color: #1A2A4A;
         }
         
-        /* ===== ACTION BAR ===== */
         .action-bar {
             display: flex;
             gap: 10px;
@@ -432,7 +400,6 @@ $conn->close();
             border-top: 1px solid #ecf0f1;
         }
         
-        /* ===== FOOTER ===== */
         .footer {
             margin-top: 30px;
             text-align: center;
@@ -451,7 +418,6 @@ $conn->close();
             color: #C9A84C;
         }
         
-        /* ===== RESPONSIVE ===== */
         @media (max-width: 768px) {
             .header {
                 flex-direction: column;
@@ -465,7 +431,6 @@ $conn->close();
 <body>
 <div class="container">
     
-    <!-- ===== HEADER ===== -->
     <div class="header">
         <div>
             <h1>View Attendance</h1>
@@ -475,11 +440,7 @@ $conn->close();
     </div>
 
     <?php if ($session_id && isset($session)): ?>
-        <!-- ============================================================ -->
-        <!-- SESSION DETAILS VIEW                                          -->
-        <!-- ============================================================ -->
-        
-        <!-- Statistics Summary -->
+    
         <div class="card">
             <h3>Attendance Summary</h3>
             <div class="stats-grid">
@@ -511,17 +472,14 @@ $conn->close();
                 <?php endif; ?>
             </div>
             
-            <!-- Action Bar -->
             <div class="action-bar">
                 <a href="generate_qr.php?session_id=<?php echo $session_id; ?>" class="btn-qr">QR Code</a>
                 <a href="view_attendance.php?unit_id=<?php echo $unit_id; ?>" class="btn-outline">Back to Sessions</a>
             </div>
         </div>
         
-        <!-- Two Column: Present + Absent -->
         <div class="two-col">
             
-            <!-- PRESENT STUDENTS -->
             <div class="card">
                 <h3>Present Students <span class="badge-present"><?php echo $total_present; ?></span></h3>
                 <?php if ($total_present > 0): ?>
@@ -544,7 +502,6 @@ $conn->close();
                 <?php endif; ?>
             </div>
             
-            <!-- ABSENT STUDENTS -->
             <div class="card">
                 <h3>Absent Students <span class="badge-absent"><?php echo $total_absent; ?></span></h3>
                 <?php if ($total_absent > 0): ?>
@@ -572,9 +529,7 @@ $conn->close();
         <a href="view_attendance.php?unit_id=<?php echo $unit_id; ?>" class="back-link">Back to all sessions</a>
         
     <?php else: ?>
-        <!-- ============================================================ -->
-        <!-- SESSIONS LIST VIEW                                           -->
-        <!-- ============================================================ -->
+   
         <div class="card">
             <h3>All Sessions</h3>
             <?php if ($sessions->num_rows > 0): ?>
@@ -602,12 +557,12 @@ $conn->close();
         </div>
     <?php endif; ?>
     
-    <!-- ===== FOOTER ===== -->
+    <!--
     <div class="footer">
         <span class="brand">KCA UNIVERSITY</span> • 
         <span class="gold">GeoQR</span> • 
         Smart Attendance Management System
-    </div>
+    </div> -->
     
 </div>
 </body>

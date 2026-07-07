@@ -29,7 +29,6 @@ $stmt->bind_param("i", $id);
 $stmt->execute();
 $courses = $stmt->get_result();
 
-// Get statistics
 $stats_query = "SELECT 
     (SELECT COUNT(*) FROM units WHERE user_id = ?) as total_courses,
     (SELECT COUNT(*) FROM attendance_sessions s JOIN units u ON s.unit_id = u.unit_id WHERE u.user_id = ?) as total_sessions,
@@ -39,7 +38,6 @@ $stmt->bind_param("iii", $id, $id, $id);
 $stmt->execute();
 $stats = $stmt->get_result()->fetch_assoc();
 
-// Get upcoming sessions
 $upcoming_query = "SELECT s.session_id, s.start_time, s.end_time, u.unit_name, g.name as geofence_name,
                    (SELECT COUNT(*) FROM attendance_logs WHERE session_id = s.session_id) as attendance_count
                    FROM attendance_sessions s
@@ -62,8 +60,6 @@ $conn->close();
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Lecturer Dashboard - GeoQR | KCA University</title>
     <style>
-        /* ===== KCA UNIVERSITY THEME ===== */
-        /* Colors: Navy Blue (#1A2A4A), Gold (#C9A84C), White (#FFFFFF) */
         
         * { margin: 0; padding: 0; box-sizing: border-box; }
         
@@ -78,7 +74,7 @@ $conn->close();
             margin: 0 auto; 
         }
         
-        /* ===== HEADER ===== */
+    
         .header { 
             background: linear-gradient(135deg, #1A2A4A 0%, #2C3E6A 100%);
             color: #FFFFFF; 
@@ -135,7 +131,6 @@ $conn->close();
             border-color: #C9A84C;
         }
         
-        /* ===== STATS ===== */
         .stats { 
             display: grid; 
             grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); 
@@ -169,7 +164,6 @@ $conn->close();
             margin-top: 5px; 
         }
         
-        /* ===== GRID LAYOUT ===== */
         .grid { 
             display: grid; 
             grid-template-columns: 2fr 1fr; 
@@ -182,7 +176,6 @@ $conn->close();
             } 
         }
         
-        /* ===== CARDS ===== */
         .card { 
             background: #FFFFFF; 
             border-radius: 12px; 
@@ -209,7 +202,6 @@ $conn->close();
             gap: 10px;
         }
         
-        /* ===== COURSE ITEMS ===== */
         .course { 
             background: #f8f9fa; 
             padding: 18px 20px; 
@@ -255,7 +247,6 @@ $conn->close();
             transition: all 0.3s ease;
         }
         
-        /* ===== BUTTONS ===== */
         .btn-primary { 
             background: #1A2A4A; 
             color: #FFFFFF; 
@@ -303,7 +294,6 @@ $conn->close();
             transform: translateY(-2px);
         }
         
-        /* ===== SESSION ITEMS ===== */
         .session-item { 
             padding: 12px 0; 
             border-bottom: 1px solid #ecf0f1; 
@@ -369,7 +359,6 @@ $conn->close();
             transform: translateY(-2px);
         }
         
-        /* ===== NO DATA ===== */
         .no-data { 
             color: #95a5a6; 
             text-align: center; 
@@ -377,7 +366,6 @@ $conn->close();
             font-style: italic;
         }
         
-        /* ===== QUICK ACTIONS ===== */
         .quick-actions { 
             display: grid; 
             grid-template-columns: 1fr 1fr; 
@@ -433,7 +421,6 @@ $conn->close();
             color: #FFFFFF;
         }
         
-        /* ===== FOOTER ===== */
         .footer {
             margin-top: 30px;
             text-align: center;
@@ -452,7 +439,6 @@ $conn->close();
             color: #C9A84C;
         }
         
-        /* ===== RESPONSIVE ===== */
         @media (max-width: 768px) {
             .header {
                 flex-direction: column;
@@ -487,7 +473,6 @@ $conn->close();
 <body>
 <div class="container">
     
-    <!-- ===== HEADER ===== -->
     <div class="header">
         <div class="header-left">
             <div class="header-logo">
@@ -504,7 +489,6 @@ $conn->close();
         <a href="logout.php" class="logout-btn">Logout</a>
     </div>
 
-    <!-- ===== STATS ===== -->
     <div class="stats">
         <div class="stat-card">
             <h3><?php echo $stats['total_courses'] ?? 0; ?></h3>
@@ -520,12 +504,9 @@ $conn->close();
         </div>
     </div>
 
-    <!-- ===== GRID LAYOUT ===== -->
     <div class="grid">
         
-        <!-- ===== LEFT COLUMN ===== -->
         <div>
-            <!-- My Courses -->
             <div class="card">
                 <h2>My Courses</h2>
                 <?php if ($courses->num_rows > 0): ?>
@@ -547,9 +528,7 @@ $conn->close();
             </div>
         </div>
 
-        <!-- ===== RIGHT COLUMN ===== -->
         <div>
-            <!-- Upcoming Sessions -->
             <div class="card">
                 <h2>Upcoming Sessions</h2>
                 <?php if ($upcoming_sessions->num_rows > 0): ?>
@@ -572,7 +551,6 @@ $conn->close();
                 <?php endif; ?>
             </div>
 
-            <!-- Quick Actions -->
             <div class="card">
                 <h2>Quick Actions</h2>
                 <div class="quick-actions">
@@ -586,12 +564,13 @@ $conn->close();
         
     </div>
     
-    <!-- ===== FOOTER ===== -->
+    <!--
     <div class="footer">
         <span class="brand">KCA UNIVERSITY</span> • 
         <span class="gold">GeoQR</span> • 
         Smart Attendance Management System
     </div>
+                -->
     
 </div>
 </body>

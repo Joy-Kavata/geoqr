@@ -44,8 +44,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - GeoQR | KCA University</title>
     <style>
-        /* ===== KCA UNIVERSITY THEME ===== */
-        /* Colors: Navy Blue (#1A2A4A), Gold (#C9A84C), White (#FFFFFF) */
         
         * { margin: 0; padding: 0; box-sizing: border-box; }
         
@@ -59,7 +57,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             padding: 20px;
         }
         
-        /* ===== LOGIN CONTAINER ===== */
         .login-container {
             background: #FFFFFF;
             border-radius: 16px;
@@ -81,8 +78,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 transform: translateY(0);
             }
         }
-        
-        /* ===== HEADER ===== */
+
         .login-header {
             text-align: center;
             margin-bottom: 30px;
@@ -124,7 +120,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             margin-top: 5px;
         }
         
-        /* ===== ERROR MESSAGE ===== */
         .error-message {
             background: #f8d7da;
             color: #721c24;
@@ -136,7 +131,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             display: <?php echo isset($error) ? 'block' : 'none'; ?>;
         }
         
-        /* ===== FORM ===== */
         .form-group {
             margin-bottom: 18px;
         }
@@ -184,7 +178,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             color: #b0b0b0;
         }
         
-        /* ===== LOGIN BUTTON ===== */
         .login-btn {
             width: 100%;
             padding: 14px;
@@ -212,7 +205,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             transform: translateY(0);
         }
         
-        /* ===== FOOTER ===== */
         .login-footer {
             text-align: center;
             margin-top: 20px;
@@ -252,7 +244,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             color: #C9A84C;
         }
         
-        /* ===== RESPONSIVE ===== */
         @media (max-width: 480px) {
             .login-container {
                 padding: 30px 20px;
@@ -278,20 +269,17 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
 <div class="login-container">
     
-    <!-- ===== HEADER ===== -->
     <div class="login-header">
-        <span class="logo-icon">🎓</span>
+        <span class="logo-icon"></span>
         <div class="uni-name">KCA <span class="gold">UNIVERSITY</span></div>
         <h1>Geo<span>QR</span></h1>
         <div class="subtitle">Smart Attendance Management System</div>
     </div>
     
-    <!-- ===== ERROR MESSAGE ===== -->
     <div class="error-message" id="errorMessage">
         <?php echo isset($error) ? $error : ''; ?>
     </div>
     
-    <!-- ===== LOGIN FORM ===== -->
     <form action="login_form.php" method="post">
         
         <div class="form-group">
@@ -314,7 +302,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         
     </form>
     
-    <!-- ===== FOOTER ===== -->
+    <!--
     <div class="login-footer">
         <p>Don't have an account? <a href="signup_form.php">Click here</a></p>
         <div class="uni-footer">
@@ -322,7 +310,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             <span class="gold">GeoQR</span> • 
             v1.0
         </div>
-    </div>
+    </div> -->
     
 </div>
 

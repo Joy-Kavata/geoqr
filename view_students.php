@@ -2,7 +2,6 @@
 session_start();
 include 'config.php';
 
-// Check if user is lecturer
 if (!isset($_SESSION['user_id']) || $_SESSION['role_id'] != 2) {
     header("Location: login_form.php");
     exit();
@@ -11,7 +10,6 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role_id'] != 2) {
 $lecturer_id = $_SESSION['user_id'];
 $unit_id = isset($_GET['unit_id']) ? $_GET['unit_id'] : 0;
 
-// Get the unit name
 $unit_query = "SELECT unit_name FROM units WHERE user_id = ? AND unit_id = ?";
 $stmt = $conn->prepare($unit_query);
 $stmt->bind_param("ii", $lecturer_id, $unit_id);
@@ -24,7 +22,6 @@ if ($unit_result->num_rows == 0) {
 $unit = $unit_result->fetch_assoc();
 $unit_name = $unit['unit_name'];
 
-// Get students enrolled in this unit
 $students_query = "SELECT u.user_id, u.full_name, u.email, 
                    (SELECT COUNT(*) FROM attendance_logs al 
                     JOIN attendance_sessions s ON al.session_id = s.session_id 
@@ -42,7 +39,6 @@ $students = $stmt->get_result();
 
 $total_students = $students->num_rows;
 
-// Get total sessions for this unit
 $total_sessions_query = "SELECT COUNT(*) as total FROM attendance_sessions WHERE unit_id = ?";
 $stmt = $conn->prepare($total_sessions_query);
 $stmt->bind_param("i", $unit_id);
@@ -51,9 +47,6 @@ $total_sessions_result = $stmt->get_result();
 $total_sessions = $total_sessions_result->fetch_assoc()['total'] ?? 0;
 $stmt->close();
 
-// ============================================================
-// ✅ FIX: Calculate average attendance BEFORE closing connection
-// ============================================================
 $avg_attendance = 0;
 if ($total_students > 0 && $total_sessions > 0) {
     $avg_query = "SELECT AVG(attended) as avg_att FROM (
@@ -72,9 +65,6 @@ if ($total_students > 0 && $total_sessions > 0) {
     $stmt->close();
 }
 
-// ============================================================
-// ✅ NOW close the connection (after all queries are done)
-// ============================================================
 $conn->close();
 ?>
 <!DOCTYPE html>
@@ -82,8 +72,6 @@ $conn->close();
 <head>
     <title>View Students - <?php echo htmlspecialchars($unit_name); ?></title>
     <style>
-        /* ===== KCA UNIVERSITY THEME ===== */
-        /* Colors: Navy Blue (#1A2A4A), Gold (#C9A84C), White (#FFFFFF) */
         
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { 
@@ -93,7 +81,6 @@ $conn->close();
         }
         .container { max-width: 1000px; margin: 0 auto; }
         
-        /* ===== HEADER ===== */
         .header { 
             background: linear-gradient(135deg, #1A2A4A 0%, #2C3E6A 100%);
             color: #FFFFFF; 
@@ -126,7 +113,6 @@ $conn->close();
             border-color: #C9A84C;
         }
         
-        /* ===== CARDS ===== */
         .card { 
             background: #FFFFFF; 
             border-radius: 12px; 
@@ -143,7 +129,6 @@ $conn->close();
             font-size: 18px;
         }
         
-        /* ===== STATS GRID ===== */
         .stats-grid { 
             display: grid; 
             grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); 
@@ -163,7 +148,6 @@ $conn->close();
         .stat-box .number { font-size: 28px; font-weight: 700; color: #1A2A4A; }
         .stat-box .label { font-size: 13px; color: #7f8c8d; margin-top: 5px; }
         
-        /* ===== TABLES ===== */
         table { 
             width: 100%; 
             border-collapse: collapse; 
@@ -182,7 +166,6 @@ $conn->close();
         }
         tr:hover { background: #f8f9fa; }
         
-        /* ===== ATTENDANCE BAR ===== */
         .attendance-bar { 
             width: 100%; 
             height: 8px; 
@@ -200,7 +183,6 @@ $conn->close();
         .attendance-bar .fill.low { background: #e74c3c; }
         .attendance-bar .fill.medium { background: #f39c12; }
         
-        /* ===== NO DATA ===== */
         .no-data { 
             color: #95a5a6; 
             text-align: center; 
@@ -208,7 +190,6 @@ $conn->close();
             font-style: italic;
         }
         
-        /* ===== BACK LINK ===== */
         .back-link { 
             display: inline-block; 
             color: #C9A84C; 
@@ -221,7 +202,6 @@ $conn->close();
             text-decoration: underline; 
         }
         
-        /* ===== STUDENT INFO ===== */
         .student-id {
             font-size: 11px;
             color: #95a5a6;
@@ -232,7 +212,6 @@ $conn->close();
             color: #1A2A4A;
         }
         
-        /* ===== RESPONSIVE ===== */
         @media (max-width: 768px) {
             .header {
                 flex-direction: column;
@@ -242,7 +221,6 @@ $conn->close();
             .header h1 { font-size: 20px; }
         }
         
-        /* ===== FOOTER ===== */
         .footer {
             margin-top: 30px;
             text-align: center;
@@ -258,7 +236,6 @@ $conn->close();
 <body>
 <div class="container">
     
-    <!-- ===== HEADER ===== -->
     <div class="header">
         <div>
             <h1>Enrolled Students</h1>
@@ -267,7 +244,6 @@ $conn->close();
         <a href="lecturer_dashboard.php" class="back">← Dashboard</a>
     </div>
 
-    <!-- ===== STATS ===== -->
     <div class="stats-grid">
         <div class="stat-box">
             <div class="number"><?php echo $total_students; ?></div>
@@ -285,7 +261,6 @@ $conn->close();
         <?php endif; ?>
     </div>
 
-    <!-- ===== STUDENT LIST ===== -->
     <div class="card">
         <h3>Student List</h3>
         <?php if ($students->num_rows > 0): ?>
@@ -328,15 +303,14 @@ $conn->close();
         <?php endif; ?>
     </div>
 
-    <!-- ===== BACK LINK ===== -->
     <a href="lecturer_dashboard.php" class="back-link">← Back to Dashboard</a>
     
-    <!-- ===== FOOTER ===== -->
+    <!--
     <div class="footer">
         <span class="brand">KCA UNIVERSITY</span> • 
         <span class="gold">GeoQR</span> • 
         Smart Attendance Management System
-    </div>
+    </div> -->
     
 </div>
 </body>

@@ -13,7 +13,6 @@ if (!$session_id) {
     die("No session specified.");
 }
 
-// Get session details
 $session_query = "SELECT s.session_id, s.start_time, s.end_time, u.unit_name, u.unit_code 
                   FROM attendance_sessions s
                   JOIN units u ON s.unit_id = u.unit_id
@@ -30,18 +29,11 @@ if (!$session) {
 
 $conn->close();
 
-// ============================================================
-// FIX: Hardcoded IP address for mobile access
-// ============================================================
-// Your computer's IP address on the network
-$server_ip = '192.168.1.24';  // <-- YOUR IP ADDRESS
-$base_url = "http://" . $server_ip . "/GeoQr/";
+$base_url = "https://geogr.great-site.net/GeoQr/";
 
-// Build QR code data
 $qr_data = $base_url . "scan_page.php?session_id=" . $session_id;
 $qr_code_url = "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=" . urlencode($qr_data);
 
-// Check if session is still active
 $now = time();
 $end_time = strtotime($session['end_time']);
 $session_expired = $now > $end_time;
@@ -215,7 +207,6 @@ $session_expired = $now > $end_time;
     
     <h2>Attendance QR Code</h2>
     
-    <!-- Session Info -->
     <div class="session-info">
         <p><strong>Unit:</strong> <?php echo htmlspecialchars($session['unit_name']); ?> (<?php echo htmlspecialchars($session['unit_code']); ?>)</p>
         <p><strong>Date:</strong> <?php echo date('l, M d, Y', strtotime($session['start_time'])); ?></p>
@@ -223,14 +214,11 @@ $session_expired = $now > $end_time;
         <p><strong>Session ID:</strong> <?php echo $session_id; ?></p>
     </div>
     
-    <!-- Network Info -->
     <div class="network-info">
-        <strong>Connect your phone to this network:</strong><br>
-        Your phone must be on the same Wi-Fi network as this computer.<br>
-        <strong>Access URL:</strong> <?php echo $base_url; ?>
+        <strong>Scan this QR code:</strong><br>
+        <?php echo $base_url; ?>
     </div>
     
-    <!-- QR Code Image -->
     <div class="qr-image">
         <img src="<?php echo $qr_code_url; ?>" alt="QR Code for Attendance">
     </div>
@@ -241,11 +229,10 @@ $session_expired = $now > $end_time;
         </div>
     <?php endif; ?>
     
-    <!-- Instructions -->
     <div class="instructions">
         <strong>How it works:</strong>
         <ol>
-            <li>Display this QR code to your students (projector/screen)</li>
+            <li>Display this QR code to your students</li>
             <li>Students scan the code using their phone camera</li>
             <li>They will be directed to mark their attendance</li>
             <li><strong>Students must be physically in class</strong></li>
@@ -253,13 +240,11 @@ $session_expired = $now > $end_time;
         </ol>
     </div>
     
-    <!-- Buttons -->
     <div style="margin-top: 15px;">
         <a href="lecturer_dashboard.php" class="btn btn-outline">Back to Dashboard</a>
         <a href="#" onclick="window.location.reload();" class="btn">Refresh QR Code</a>
     </div>
     
-    <!-- Security Notice -->
     <div style="margin-top: 15px; padding: 10px; background: #fff3cd; border-radius: 6px; font-size: 13px; color: #856404; border-left: 4px solid #ffc107; text-align: left;">
         <strong>Security Notice:</strong> This QR code is session-specific and expires when the session ends. 
         Do not share or download this code. Students must scan directly from the screen.

@@ -23,10 +23,8 @@ if ($result-> num_rows > 0) {
 
 $first_name = explode(" ", $user['full_name'])[0];
 
-// Check if student came from QR code scan
 $scanned_session_id = isset($_GET['session_id']) ? $_GET['session_id'] : 0;
 
-// Get student's enrolled units
 $units_query = "SELECT u.unit_id, u.unit_name, u.unit_code 
                 FROM units u
                 JOIN enrollment e ON u.unit_id = e.unit_id
@@ -37,8 +35,7 @@ $stmt->bind_param("i", $id);
 $stmt->execute();
 $enrolled_units = $stmt->get_result();
 
-// Get today's active sessions for student's enrolled units
-$today_sessions_query = "SELECT s.session_id, s.start_time, s.end_time, u.unit_name, u.unit_code, g.name as geofence_name,
+$active_sessions_query = "SELECT s.session_id, s.start_time, s.end_time, u.unit_name, u.unit_code, g.name as geofence_name,
                          (SELECT COUNT(*) FROM attendance_logs WHERE session_id = s.session_id AND user_id = ?) as already_checked_in
                          FROM attendance_sessions s
                          JOIN units u ON s.unit_id = u.unit_id
@@ -46,22 +43,34 @@ $today_sessions_query = "SELECT s.session_id, s.start_time, s.end_time, u.unit_n
                          WHERE s.start_time <= NOW() AND s.end_time >= NOW()
                          AND u.unit_id IN (SELECT unit_id FROM enrollment WHERE user_id = ?)
                          ORDER BY s.start_time ASC";
-$stmt = $conn->prepare($today_sessions_query);
+$stmt = $conn->prepare($active_sessions_query);
 $stmt->bind_param("ii", $id, $id);
 $stmt->execute();
 $active_sessions = $stmt->get_result();
 
-// Store active sessions in array for JavaScript
 $active_sessions_array = [];
 while ($session = $active_sessions->fetch_assoc()) {
     $active_sessions_array[] = $session;
 }
 
-// ============================================================
-// GET COMPLETE ATTENDANCE HISTORY (Present + Absent)
-// ============================================================
+$upcoming_sessions_query = "SELECT s.session_id, s.start_time, s.end_time, u.unit_name, u.unit_code, g.name as geofence_name,
+                           (SELECT COUNT(*) FROM attendance_logs WHERE session_id = s.session_id AND user_id = ?) as already_checked_in
+                           FROM attendance_sessions s
+                           JOIN units u ON s.unit_id = u.unit_id
+                           LEFT JOIN geofences g ON s.geofence_id = g.geofence_id
+                           WHERE s.start_time > NOW()
+                           AND u.unit_id IN (SELECT unit_id FROM enrollment WHERE user_id = ?)
+                           ORDER BY s.start_time ASC";
+$stmt = $conn->prepare($upcoming_sessions_query);
+$stmt->bind_param("ii", $id, $id);
+$stmt->execute();
+$upcoming_sessions = $stmt->get_result();
 
-// 1. Get all sessions for student's enrolled units (past, present, future)
+$upcoming_sessions_array = [];
+while ($session = $upcoming_sessions->fetch_assoc()) {
+    $upcoming_sessions_array[] = $session;
+}
+
 $all_sessions_query = "SELECT s.session_id, s.start_time, s.end_time, u.unit_name, u.unit_code, g.name as geofence_name,
                        (SELECT COUNT(*) FROM attendance_logs WHERE session_id = s.session_id AND user_id = ?) as checked_in,
                        (SELECT check_in_time FROM attendance_logs WHERE session_id = s.session_id AND user_id = ?) as check_in_time,
@@ -77,13 +86,11 @@ $stmt->bind_param("iiii", $id, $id, $id, $id);
 $stmt->execute();
 $all_sessions = $stmt->get_result();
 
-// Store all sessions in array for easier processing
 $all_sessions_array = [];
 while ($session = $all_sessions->fetch_assoc()) {
     $all_sessions_array[] = $session;
 }
 
-// 2. Calculate attendance statistics
 $total_sessions = count($all_sessions_array);
 $attended_count = 0;
 $missed_count = 0;
@@ -98,7 +105,7 @@ foreach ($all_sessions_array as $session) {
         $attended_count++;
     } elseif ($now > $end) {
         $missed_count++;
-    } else {
+    } elseif ($now < $start) {
         $upcoming_count++;
     }
 }
@@ -115,7 +122,6 @@ $conn->close();
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Student Dashboard - GeoQR | KCA University</title>
     <style>
-        /* ===== KCA UNIVERSITY THEME ===== */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         
         body { 
@@ -328,6 +334,8 @@ $conn->close();
         .status-badge.active { background: #d4edda; color: #155724; }
         .status-badge.checked { background: #cce5ff; color: #004085; }
         .status-badge.ended { background: #f8d7da; color: #721c24; }
+        .status-badge.upcoming { background: #fff3cd; color: #856404; }
+        .status-badge.live { background: #27ae60; color: #ffffff; }
         
         .btn-checkin {
             background: #27ae60;
@@ -343,18 +351,6 @@ $conn->close();
         .btn-checkin:disabled { background: #95a5a6; cursor: not-allowed; transform: none; }
         .btn-checkin.checked-in { background: #3498db; }
         
-        .btn-scan-camera {
-            background: #8e44ad;
-            color: #FFFFFF;
-            padding: 8px 20px;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            font-weight: 600;
-            transition: all 0.3s ease;
-        }
-        .btn-scan-camera:hover { background: #6c3483; transform: translateY(-2px); }
-        
         table { width: 100%; border-collapse: collapse; font-size: 14px; }
         th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid #ecf0f1; }
         th { background: #f8f9fa; font-weight: 600; color: #1A2A4A; border-bottom: 2px solid #C9A84C; }
@@ -368,8 +364,9 @@ $conn->close();
         .no-data { color: #95a5a6; text-align: center; padding: 20px; }
         .check-in-time { font-size: 12px; color: #95a5a6; }
         
-        .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 25px; }
-        @media (max-width: 768px) { .two-col { grid-template-columns: 1fr; } }
+        .three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 25px; }
+        @media (max-width: 992px) { .three-col { grid-template-columns: 1fr 1fr; } }
+        @media (max-width: 768px) { .three-col { grid-template-columns: 1fr; } }
         
         .footer {
             margin-top: 30px;
@@ -458,16 +455,36 @@ $conn->close();
             justify-content: center;
             margin-top: 10px;
         }
+        
+        .live-badge {
+            background: #e74c3c;
+            color: white;
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            display: inline-block;
+            animation: pulse 1.5s infinite;
+        }
+        
+        .upcoming-badge {
+            background: #f39c12;
+            color: white;
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            display: inline-block;
+        }
     </style>
 </head>
 <body>
 <div class="container">
     
-    <!-- ===== HEADER ===== -->
     <div class="header">
         <div class="header-left">
             <div class="header-logo">
-                <span class="logo-icon">🎓</span>
+                <span class="logo-icon"></span>
                 <div>
                     <span class="logo-text">KCA UNIVERSITY</span>
                 </div>
@@ -480,7 +497,6 @@ $conn->close();
         <a href="logout.php" class="logout-btn">Logout</a>
     </div>
     
-    <!-- ===== STATS ===== -->
     <div class="stats-grid">
         <div class="stat-card">
             <div class="number gold"><?php echo $attendance_percentage; ?>%</div>
@@ -500,12 +516,11 @@ $conn->close();
         </div>
     </div>
     
-    <!-- ===== QR SCANNER SECTION ===== -->
     <div class="scanner-section">
         <h2>QR Code Scanner</h2>
         <div class="scanner-box" id="scannerBox">
             <?php if (count($active_sessions_array) > 0): ?>
-                <div class="qr-icon">📷</div>
+                <div class="qr-icon"></div>
                 <h3>Scan QR Code to Mark Attendance</h3>
                 <p>Point your camera at the QR code displayed by your lecturer.</p>
                 <?php if ($scanned_session_id > 0): ?>
@@ -524,7 +539,7 @@ $conn->close();
                 <button class="scan-btn" onclick="startCamera()">Open Camera to Scan</button>
                 <p class="scanner-instruction">After scanning, attendance will be marked automatically.</p>
             <?php else: ?>
-                <div class="qr-icon">📷</div>
+                <div class="qr-icon"></div>
                 <h3>No Active Sessions</h3>
                 <p>There are no active attendance sessions for your enrolled units right now.</p>
                 <p style="font-size: 12px; color: #95a5a6; margin-top: 10px;">Check back when your lecturer starts a session.</p>
@@ -532,12 +547,8 @@ $conn->close();
         </div>
     </div>
     
-    <!-- ============================================================ -->
-    <!-- TWO COLUMN: ACTIVE SESSIONS + ENROLLED UNITS                 -->
-    <!-- ============================================================ -->
-    <div class="two-col">
+    <div class="three-col">
         
-        <!-- ===== ACTIVE SESSIONS ===== -->
         <div class="card">
             <h3 class="section-title">Active Sessions</h3>
             <?php if (count($active_sessions_array) > 0): ?>
@@ -553,6 +564,7 @@ $conn->close();
                                 <?php echo date('H:i', strtotime($session['start_time'])); ?> - 
                                 <?php echo date('H:i', strtotime($session['end_time'])); ?>
                             </div>
+                            <div class="live-badge">LIVE NOW</div>
                         </div>
                         <div style="text-align: right;">
                             <?php if ($checked_in): ?>
@@ -566,11 +578,34 @@ $conn->close();
                     </div>
                 <?php endforeach; ?>
             <?php else: ?>
-                <div class="no-data">No active sessions for your enrolled units.</div>
+                <div class="no-data">No active sessions right now.</div>
             <?php endif; ?>
         </div>
         
-        <!-- ===== ENROLLED UNITS ===== -->
+        <div class="card">
+            <h3 class="section-title">Upcoming Sessions</h3>
+            <?php if (count($upcoming_sessions_array) > 0): ?>
+                <?php foreach ($upcoming_sessions_array as $session): ?>
+                    <div class="session-item">
+                        <div class="info">
+                            <div class="title"><?php echo htmlspecialchars($session['unit_name']); ?></div>
+                            <div class="code"><?php echo htmlspecialchars($session['unit_code']); ?></div>
+                            <div class="meta">
+                                <?php echo htmlspecialchars($session['geofence_name'] ?? 'No location'); ?> • 
+                                <?php echo date('M d, H:i', strtotime($session['start_time'])); ?>
+                            </div>
+                            <div class="upcoming-badge">Upcoming</div>
+                        </div>
+                        <div style="text-align: right;">
+                            <span class="status-badge upcoming">Upcoming</span>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
+            <?php else: ?>
+                <div class="no-data">No upcoming sessions.</div>
+            <?php endif; ?>
+        </div>
+        
         <div class="card">
             <h3 class="section-title">Your Enrolled Units</h3>
             <?php if ($enrolled_units->num_rows > 0): ?>
@@ -588,9 +623,6 @@ $conn->close();
         
     </div>
     
-    <!-- ============================================================ -->
-    <!-- COMPLETE ATTENDANCE HISTORY                                  -->
-    <!-- ============================================================ -->
     <div class="card">
         <h3 class="section-title">Complete Attendance History</h3>
         
@@ -662,7 +694,6 @@ $conn->close();
         <?php endif; ?>
     </div>
     
-    <!-- ===== FOOTER ===== -->
     <div class="footer">
         <span class="brand">KCA UNIVERSITY</span> • 
         <span class="gold">GeoQR</span> • 
@@ -672,15 +703,9 @@ $conn->close();
 </div>
 
 <script>
-    // ============================================================
-    // PASS PHP DATA TO JAVASCRIPT
-    // ============================================================
     const activeSessions = <?php echo json_encode($active_sessions_array); ?>;
     const scannedSessionId = <?php echo $scanned_session_id; ?>;
     
-    // ============================================================
-    // AUTO-SCAN FROM QR CODE (ON PAGE LOAD)
-    // ============================================================
     document.addEventListener('DOMContentLoaded', function() {
         if (scannedSessionId > 0) {
             const select = document.getElementById('sessionSelect');
@@ -688,7 +713,6 @@ $conn->close();
                 for (let i = 0; i < select.options.length; i++) {
                     if (parseInt(select.options[i].value) === scannedSessionId) {
                         select.selectedIndex = i;
-                        // Auto-open camera after 1.5 seconds
                         setTimeout(function() {
                             startCamera();
                         }, 1500);
@@ -699,9 +723,6 @@ $conn->close();
         }
     });
     
-    // ============================================================
-    // OPEN CAMERA FOR QR SCANNING
-    // ============================================================
     let videoStream = null;
     let scanTimeout = null;
     let isScanning = false;
@@ -723,13 +744,11 @@ $conn->close();
             return;
         }
         
-        // Check if browser supports camera
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-            alert('Your browser does not support camera access. Please use the "Check In" button instead.');
+            alert('Your browser does not support camera access. Please use the Check In button instead.');
             return;
         }
         
-        // Show camera preview
         scannerBox.innerHTML = `
             <div class="qr-icon"></div>
             <h3>Scanning QR Code</h3>
@@ -744,7 +763,6 @@ $conn->close();
         `;
         scannerBox.classList.add('active');
         
-        // Start camera
         navigator.mediaDevices.getUserMedia({ 
             video: { facingMode: "environment" } 
         })
@@ -755,37 +773,28 @@ $conn->close();
                 video.srcObject = stream;
                 video.setAttribute('playsinline', true);
                 video.play();
-                
-                // Update status
                 document.getElementById('scannerStatus').textContent = 'Camera ready - scanning for QR code...';
-                
-                // Start scanning after camera is ready
                 startQRScanning(stream, sessionId);
             }
         })
         .catch(function(err) {
-            document.getElementById('scannerStatus').textContent = 'Camera access denied. Please allow camera access or use "Manual Check In".';
+            document.getElementById('scannerStatus').textContent = 'Camera access denied. Please allow camera access or use Manual Check In.';
             console.error('Camera error:', err);
         });
     }
     
-    // ============================================================
-    // QR SCANNING SIMULATION
-    // ============================================================
     function startQRScanning(stream, sessionId) {
         isScanning = true;
         let scanAttempts = 0;
-        const maxAttempts = 30; // ~30 seconds
+        const maxAttempts = 30;
         
         function attemptScan() {
             if (!isScanning) return;
             
             scanAttempts++;
-            document.getElementById('scannerStatus').textContent = `Scanning... (${scanAttempts}/${maxAttempts})`;
+            document.getElementById('scannerStatus').textContent = 'Scanning... (' + scanAttempts + '/' + maxAttempts + ')';
             
-            // Simulate QR code detection after 5-8 seconds (for testing)
             if (scanAttempts >= 5) {
-                // Simulate successful QR scan
                 const session = activeSessions.find(s => s.session_id == sessionId);
                 if (session) {
                     document.getElementById('scannerStatus').textContent = 'QR Code detected! Marking attendance...';
@@ -794,22 +803,17 @@ $conn->close();
                 }
             }
             
-            // Continue scanning
             if (scanAttempts < maxAttempts) {
                 setTimeout(attemptScan, 1000);
             } else {
-                document.getElementById('scannerStatus').textContent = '⏰ QR code not detected. Please try again or use "Manual Check In".';
+                document.getElementById('scannerStatus').textContent = 'QR code not detected. Please try again or use Manual Check In.';
                 isScanning = false;
             }
         }
         
-        // Start scanning after 1 second
         setTimeout(attemptScan, 1000);
     }
     
-    // ============================================================
-    // MANUAL CHECK IN (FALLBACK)
-    // ============================================================
     function manualCheckIn() {
         const sessionSelect = document.getElementById('sessionSelect');
         if (!sessionSelect) return;
@@ -822,9 +826,6 @@ $conn->close();
         }
     }
     
-    // ============================================================
-    // MARK ATTENDANCE
-    // ============================================================
     function markAttendance(sessionId, unitName) {
         const scannerBox = document.getElementById('scannerBox');
         
@@ -842,7 +843,4 @@ $conn->close();
                     <div class="qr-icon"></div>
                     <h3 style="color: #27ae60;">Attendance Marked Successfully!</h3>
                     <p>You have been checked in for <strong>${data.unit_name || unitName}</strong></p>
-                    <p style="font-size: 12px; color: #95a5a6;">Location verified: ${data.location || 'No location'}</p>
-                    <button onclick="location.reload()" style="background: #C9A84C; color: #1A2A4A; padding: 10px 25px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; margin-top: 10px;">Refresh</button>
-                `;
-               
+                    <p style="font-size:

@@ -4,7 +4,6 @@ include 'config.php';
 
 header('Content-Type: application/json');
 
-// Check if user is logged in and is student
 if (!isset($_SESSION['user_id']) || $_SESSION['role_id'] != 1) {
     echo json_encode(['success' => false, 'message' => 'Please login as student']);
     exit();
@@ -18,7 +17,6 @@ if (!$session_id) {
     exit();
 }
 
-// Get session details
 $session_query = "SELECT s.session_id, s.unit_id, s.start_time, s.end_time, 
                   u.unit_name, u.unit_code, g.name as geofence_name
                   FROM attendance_sessions s
@@ -36,7 +34,6 @@ if (!$session) {
     exit();
 }
 
-// Check if session is active
 $now = time();
 $start = strtotime($session['start_time']);
 $end = strtotime($session['end_time']);
@@ -51,7 +48,6 @@ if ($now > $end) {
     exit();
 }
 
-// Check if student is enrolled in this unit
 $enrollment_check = "SELECT * FROM enrollment WHERE user_id = ? AND unit_id = ?";
 $stmt = $conn->prepare($enrollment_check);
 $stmt->bind_param("ii", $user_id, $session['unit_id']);
@@ -63,7 +59,6 @@ if ($enrollment_result->num_rows == 0) {
     exit();
 }
 
-// Check if already checked in
 $check_query = "SELECT * FROM attendance_logs WHERE session_id = ? AND user_id = ?";
 $stmt = $conn->prepare($check_query);
 $stmt->bind_param("ii", $session_id, $user_id);
@@ -75,7 +70,6 @@ if ($check_result->num_rows > 0) {
     exit();
 }
 
-// Mark attendance
 $insert = $conn->prepare("INSERT INTO attendance_logs (session_id, user_id, status) VALUES (?, ?, 'present')");
 $insert->bind_param("ii", $session_id, $user_id);
 

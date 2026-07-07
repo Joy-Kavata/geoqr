@@ -1,15 +1,12 @@
 <?php
-// ===== SET TIMEZONE =====
 date_default_timezone_set('Africa/Nairobi');
 
 echo "<h2>Timezone Test</h2>";
 
-// Check PHP timezone
 echo "<h3>PHP Timezone:</h3>";
 echo "Default timezone: " . date_default_timezone_get() . "<br>";
 echo "Current time: " . date('Y-m-d H:i:s') . "<br><br>";
 
-// Check MySQL timezone
 include 'config.php';
 $result = $conn->query("SELECT NOW() as mysql_time, @@session.time_zone as timezone");
 $row = $result->fetch_assoc();
@@ -18,7 +15,6 @@ echo "<h3>MySQL Timezone:</h3>";
 echo "MySQL current time: " . $row['mysql_time'] . "<br>";
 echo "MySQL timezone: " . $row['timezone'] . "<br><br>";
 
-// Check sessions
 $session_query = "SELECT session_id, start_time, end_time, 
                   NOW() as current_time,
                   CASE 
