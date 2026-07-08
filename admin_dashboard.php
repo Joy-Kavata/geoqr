@@ -104,7 +104,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['enroll_student'])) {
     $user_id = $_POST['user_id'];
     $unit_id = $_POST['unit_id'];
     
-    // Check if already enrolled
     $check = $conn->prepare("SELECT * FROM enrollment WHERE user_id = ? AND unit_id = ?");
     $check->bind_param("ii", $user_id, $unit_id);
     $check->execute();

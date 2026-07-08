@@ -570,8 +570,8 @@ $conn->close();
                             <?php if ($checked_in): ?>
                                 <span class="status-badge checked">Checked In</span>
                             <?php else: ?>
-                                <button class="btn-checkin" onclick="quickCheckIn(<?php echo $session['session_id']; ?>, '<?php echo addslashes($session['unit_name']); ?>')">
-                                    Check In
+                                <button class="btn-checkin" onclick="openScannerForSession(<?php echo $session['session_id']; ?>)">
+                                    Scan QR
                                 </button>
                             <?php endif; ?>
                         </div>
@@ -702,6 +702,7 @@ $conn->close();
     
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 <script>
     const activeSessions = <?php echo json_encode($active_sessions_array); ?>;
     const scannedSessionId = <?php echo $scanned_session_id; ?>;
@@ -724,9 +725,24 @@ $conn->close();
     });
     
     let videoStream = null;
-    let scanTimeout = null;
     let isScanning = false;
+    let currentSessionId = null;
+    let currentScanTimer = null;
+    let currentScanLoop = null;
+    let lastQrText = '';
     
+    function openScannerForSession(sessionId) {
+        const select = document.getElementById('sessionSelect');
+        if (select) {
+            select.value = sessionId;
+        }
+        const scannerBox = document.getElementById('scannerBox');
+        if (scannerBox) {
+            scannerBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+        startCamera();
+    }
+
     function startCamera() {
         const scannerBox = document.getElementById('scannerBox');
         const sessionSelect = document.getElementById('sessionSelect');
@@ -743,9 +759,19 @@ $conn->close();
             alert('Please select a valid session.');
             return;
         }
+
+        if (parseInt(session.already_checked_in || 0, 10) > 0) {
+            scannerBox.innerHTML = `
+                <div class="qr-icon"></div>
+                <h3>You are already checked in</h3>
+                <p>You have already checked in for <strong>${session.unit_name}</strong>. No further scan is needed.</p>
+            `;
+            scannerBox.classList.remove('active');
+            return;
+        }
         
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-            alert('Your browser does not support camera access. Please use the Check In button instead.');
+            alert('Your browser does not support camera access. Please allow camera access and try again.');
             return;
         }
         
@@ -757,14 +783,13 @@ $conn->close();
             <div class="scanner-status" id="scannerStatus">Initializing camera...</div>
             <div class="action-row">
                 <button onclick="stopCameraAndReset()" style="background: #e74c3c; color: white; padding: 10px 25px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">Cancel</button>
-                <button onclick="manualCheckIn()" style="background: #C9A84C; color: #1A2A4A; padding: 10px 25px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">Manual Check In</button>
             </div>
             <p class="scanner-instruction">Align the QR code in the camera view</p>
         `;
         scannerBox.classList.add('active');
         
         navigator.mediaDevices.getUserMedia({ 
-            video: { facingMode: "environment" } 
+            video: { facingMode: 'environment' } 
         })
         .then(function(stream) {
             videoStream = stream;
@@ -774,7 +799,8 @@ $conn->close();
                 video.setAttribute('playsinline', true);
                 video.play();
                 document.getElementById('scannerStatus').textContent = 'Camera ready - scanning for QR code...';
-                startQRScanning(stream, sessionId);
+                currentSessionId = sessionId;
+                startQRScanning(sessionId);
             }
         })
         .catch(function(err) {
@@ -783,35 +809,84 @@ $conn->close();
         });
     }
     
-    function startQRScanning(stream, sessionId) {
+    function showScanError(message) {
+        const scannerStatus = document.getElementById('scannerStatus');
+        if (scannerStatus) {
+            scannerStatus.textContent = message;
+        }
         isScanning = true;
-        let scanAttempts = 0;
-        const maxAttempts = 30;
+        lastQrText = '';
+        if (currentScanTimer) {
+            clearTimeout(currentScanTimer);
+        }
+        currentScanTimer = setTimeout(() => {
+            if (isScanning) {
+                const video = document.getElementById('video');
+                if (video && video.readyState >= 2) {
+                    currentScanLoop();
+                }
+            }
+        }, 800);
+    }
+
+    function startQRScanning(sessionId) {
+        if (isScanning) return;
+        isScanning = true;
+        lastQrText = '';
+        const video = document.getElementById('video');
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
         
-        function attemptScan() {
-            if (!isScanning) return;
+        currentScanLoop = function scanFrame() {
+            if (!isScanning || !video || video.readyState < 2) {
+                if (isScanning) {
+                    currentScanTimer = setTimeout(scanFrame, 200);
+                }
+                return;
+            }
             
-            scanAttempts++;
-            document.getElementById('scannerStatus').textContent = 'Scanning... (' + scanAttempts + '/' + maxAttempts + ')';
+            const width = video.videoWidth;
+            const height = video.videoHeight;
+            if (!width || !height) {
+                currentScanTimer = setTimeout(scanFrame, 200);
+                return;
+            }
             
-            if (scanAttempts >= 5) {
-                const session = activeSessions.find(s => s.session_id == sessionId);
-                if (session) {
-                    document.getElementById('scannerStatus').textContent = 'QR Code detected! Marking attendance...';
-                    markAttendance(sessionId, session.unit_name);
+            canvas.width = width;
+            canvas.height = height;
+            context.drawImage(video, 0, 0, width, height);
+            
+            const imageData = context.getImageData(0, 0, width, height);
+            const code = jsQR(imageData.data, width, height, { inversionAttempts: 'dontInvert' });
+            
+            if (code && code.data) {
+                const qrText = code.data.trim();
+                if (qrText && qrText !== lastQrText) {
+                    lastQrText = qrText;
+                    document.getElementById('scannerStatus').textContent = 'QR code detected! Processing...';
+                    if (qrText.includes('session_id=')) {
+                        const match = qrText.match(/session_id=(\d+)/);
+                        const scannedSessionId = match ? parseInt(match[1], 10) : null;
+                        if (scannedSessionId) {
+                            if (scannedSessionId === parseInt(sessionId, 10)) {
+                                isScanning = false;
+                                markAttendance(sessionId, activeSessions.find(s => s.session_id == sessionId)?.unit_name || 'this session');
+                                return;
+                            }
+                            showScanError('This QR code does not belong to the current class. Please scan the QR code displayed by your lecturer.');
+                            return;
+                        }
+                    }
+
+                    showScanError('This is not a valid attendance QR code. Please scan the QR code displayed by your lecturer.');
                     return;
                 }
             }
             
-            if (scanAttempts < maxAttempts) {
-                setTimeout(attemptScan, 1000);
-            } else {
-                document.getElementById('scannerStatus').textContent = 'QR code not detected. Please try again or use Manual Check In.';
-                isScanning = false;
-            }
+            currentScanTimer = setTimeout(currentScanLoop, 200);
         }
         
-        setTimeout(attemptScan, 1000);
+        currentScanTimer = setTimeout(currentScanLoop, 500);
     }
     
     function manualCheckIn() {
@@ -826,8 +901,47 @@ $conn->close();
         }
     }
     
+    function stopCameraAndReset() {
+        isScanning = false;
+        if (currentScanTimer) {
+            clearTimeout(currentScanTimer);
+            currentScanTimer = null;
+        }
+        if (videoStream) {
+            videoStream.getTracks().forEach(track => track.stop());
+            videoStream = null;
+        }
+        const scannerBox = document.getElementById('scannerBox');
+        if (scannerBox) {
+            scannerBox.classList.remove('active');
+            scannerBox.innerHTML = `
+                <div class="qr-icon"></div>
+                <h3>Scan QR Code to Mark Attendance</h3>
+                <p>Point your camera at the QR code displayed by your lecturer.</p>
+                <select id="sessionSelect" class="session-select">
+                    ${activeSessions.map(session => `
+                        <option value="${session.session_id}" ${session.session_id == currentSessionId ? 'selected' : ''}>${session.unit_name} - ${session.geofence_name || 'No location'}</option>
+                    `).join('')}
+                </select>
+                <button class="scan-btn" onclick="startCamera()">Open Camera to Scan</button>
+                <p class="scanner-instruction">After scanning, attendance will be marked automatically.</p>
+            `;
+        }
+    }
+    
+    function quickCheckIn(sessionId, unitName) {
+        stopCameraAndReset();
+        markAttendance(sessionId, unitName);
+    }
+
     function markAttendance(sessionId, unitName) {
         const scannerBox = document.getElementById('scannerBox');
+        scannerBox.innerHTML = `
+            <div class="qr-icon"></div>
+            <h3>Marking Attendance...</h3>
+            <p>Please wait while we verify your check-in for <strong>${unitName}</strong>.</p>
+        `;
+        scannerBox.classList.add('active');
         
         fetch('mark_attendance.php', {
             method: 'POST',
@@ -843,4 +957,31 @@ $conn->close();
                     <div class="qr-icon"></div>
                     <h3 style="color: #27ae60;">Attendance Marked Successfully!</h3>
                     <p>You have been checked in for <strong>${data.unit_name || unitName}</strong></p>
-                    <p style="font-size:
+                    <p style="font-size: 14px; color: #7f8c8d; margin-top: 6px;">${data.location || 'Location not set'}</p>
+                    <button class="scan-btn" onclick="window.location.reload()" style="margin-top: 15px;">Done</button>
+                `;
+                scannerBox.classList.add('active');
+            } else {
+                scannerBox.innerHTML = `
+                    <div class="qr-icon"></div>
+                    <h3 style="color: #e74c3c;">Check-in Failed</h3>
+                    <p>${data.message || 'Unable to mark attendance right now.'}</p>
+                    <button class="scan-btn" onclick="window.location.reload()" style="margin-top: 15px;">Try Again</button>
+                `;
+                scannerBox.classList.remove('active');
+            }
+        })
+        .catch(function(err) {
+            scannerBox.innerHTML = `
+                <div class="qr-icon"></div>
+                <h3 style="color: #e74c3c;">Check-in Failed</h3>
+                <p>There was a problem connecting to the attendance server.</p>
+                <button class="scan-btn" onclick="window.location.reload()" style="margin-top: 15px;">Try Again</button>
+            `;
+            scannerBox.classList.remove('active');
+            console.error('Attendance submission error:', err);
+        });
+    }
+</script>
+</body>
+</html>

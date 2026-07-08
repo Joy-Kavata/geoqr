@@ -29,10 +29,10 @@ if (!$session) {
 
 $conn->close();
 
-$base_url = "https://geogr.great-site.net/GeoQr/";
+$base_url = ((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https://' : 'http://') . $_SERVER['HTTP_HOST'] . rtrim(dirname($_SERVER['PHP_SELF']), '/') . '/';
 
-$qr_data = $base_url . "scan_page.php?session_id=" . $session_id;
-$qr_code_url = "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=" . urlencode($qr_data);
+$qr_data = $base_url . 'scan_page.php?session_id=' . $session_id;
+$qr_code_url = 'https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=' . urlencode($qr_data);
 
 $now = time();
 $end_time = strtotime($session['end_time']);
