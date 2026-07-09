@@ -18,7 +18,7 @@ if (!$session_id) {
 }
 
 $session_query = "SELECT s.session_id, s.unit_id, s.start_time, s.end_time, 
-                  u.unit_name, u.unit_code, g.name as geofence_name
+                  u.unit_name, u.unit_code, g.geofence_id, g.name as geofence_name, g.latitude as geofence_latitude, g.longitude as geofence_longitude, g.radius as geofence_radius
                   FROM attendance_sessions s
                   JOIN units u ON s.unit_id = u.unit_id
                   LEFT JOIN geofences g ON s.geofence_id = g.geofence_id
@@ -70,8 +70,40 @@ if ($check_result->num_rows > 0) {
     exit();
 }
 
-$insert = $conn->prepare("INSERT INTO attendance_logs (session_id, user_id, status) VALUES (?, ?, 'present')");
-$insert->bind_param("ii", $session_id, $user_id);
+$latitude = isset($_POST['latitude']) ? (float)$_POST['latitude'] : null;
+$longitude = isset($_POST['longitude']) ? (float)$_POST['longitude'] : null;
+
+if (!empty($session['geofence_id'])) {
+    if ($latitude === null || $longitude === null) {
+        echo json_encode(['success' => false, 'message' => 'Location access is required. Please enable location services and try again.']);
+        exit();
+    }
+
+    $earth_radius = 6371000;
+    $lat1 = deg2rad($latitude);
+    $lat2 = deg2rad($session['geofence_latitude']);
+    $delta_lat = deg2rad($session['geofence_latitude'] - $latitude);
+    $delta_lon = deg2rad($session['geofence_longitude'] - $longitude);
+
+    $a = sin($delta_lat / 2) * sin($delta_lat / 2) + cos($lat1) * cos($lat2) * sin($delta_lon / 2) * sin($delta_lon / 2);
+    $c = 2 * atan2(sqrt($a), sqrt(1 - $a));
+    $distance = $earth_radius * $c;
+
+    if ($distance > (float)$session['geofence_radius']) {
+        $expected_location = !empty($session['geofence_name']) ? $session['geofence_name'] : 'the assigned class venue';
+        $unit_name = !empty($session['unit_name']) ? $session['unit_name'] : 'this class';
+        echo json_encode([
+            'success' => false,
+            'message' => 'You are in the wrong venue. Please move to ' . $expected_location . ' for ' . $unit_name . ' and try again.',
+            'expected_location' => $expected_location,
+            'unit_name' => $unit_name
+        ]);
+        exit();
+    }
+}
+
+$insert = $conn->prepare("INSERT INTO attendance_logs (session_id, user_id, status, latitude, longitude) VALUES (?, ?, 'present', ?, ?)");
+$insert->bind_param("iidd", $session_id, $user_id, $latitude, $longitude);
 
 if ($insert->execute()) {
     echo json_encode([

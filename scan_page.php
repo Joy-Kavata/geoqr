@@ -746,13 +746,13 @@ $conn->close();
     function startCamera() {
         const scannerBox = document.getElementById('scannerBox');
         const sessionSelect = document.getElementById('sessionSelect');
+        const sessionId = sessionSelect ? sessionSelect.value : currentSessionId;
         
-        if (!sessionSelect) {
+        if (!sessionId) {
             alert('No active sessions available!');
             return;
         }
         
-        const sessionId = sessionSelect.value;
         const session = activeSessions.find(s => s.session_id == sessionId);
         
         if (!session) {
@@ -829,6 +829,18 @@ $conn->close();
         }, 800);
     }
 
+    function showAttendanceFeedback(title, message, buttonLabel, buttonAction, accentColor = '#e74c3c') {
+        const scannerBox = document.getElementById('scannerBox');
+        if (!scannerBox) return;
+        scannerBox.innerHTML = `
+            <div class="qr-icon"></div>
+            <h3 style="color: ${accentColor};">${title}</h3>
+            <p>${message}</p>
+            ${buttonLabel ? `<button class="scan-btn" onclick="${buttonAction}" style="margin-top: 15px;">${buttonLabel}</button>` : ''}
+        `;
+        scannerBox.classList.add('active');
+    }
+
     function startQRScanning(sessionId) {
         if (isScanning) return;
         isScanning = true;
@@ -870,7 +882,7 @@ $conn->close();
                         if (scannedSessionId) {
                             if (scannedSessionId === parseInt(sessionId, 10)) {
                                 isScanning = false;
-                                markAttendance(sessionId, activeSessions.find(s => s.session_id == sessionId)?.unit_name || 'this session');
+                                requestGeolocationAndSubmit(sessionId, activeSessions.find(s => s.session_id == sessionId)?.unit_name || 'this session');
                                 return;
                             }
                             showScanError('This QR code does not belong to the current class. Please scan the QR code displayed by your lecturer.');
@@ -931,10 +943,43 @@ $conn->close();
     
     function quickCheckIn(sessionId, unitName) {
         stopCameraAndReset();
-        markAttendance(sessionId, unitName);
+        requestGeolocationAndSubmit(sessionId, unitName);
     }
 
-    function markAttendance(sessionId, unitName) {
+    function startCameraForSession(sessionId) {
+        currentSessionId = sessionId;
+        startCamera();
+    }
+
+    function requestGeolocationAndSubmit(sessionId, unitName) {
+        const scannerBox = document.getElementById('scannerBox');
+        scannerBox.innerHTML = `
+            <div class="qr-icon"></div>
+            <h3>Checking your location...</h3>
+            <p>Please allow location access so we can verify you are within the class geofence.</p>
+        `;
+        scannerBox.classList.add('active');
+
+        if (!navigator.geolocation) {
+            showScanError('Geolocation is not supported by this browser. Please use a device that supports location access.');
+            return;
+        }
+
+        navigator.geolocation.getCurrentPosition(function(position) {
+            markAttendance(sessionId, unitName, position.coords.latitude, position.coords.longitude);
+        }, function(error) {
+            const message = error.code === 1
+                ? 'Location access was denied. Please allow location access and try again.'
+                : 'Unable to retrieve your location right now. Please try again when you are in a good signal area.';
+            showAttendanceFeedback('Location Needed', message, 'Try Again', `startCameraForSession(${sessionId})`);
+        }, {
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 0
+        });
+    }
+
+    function markAttendance(sessionId, unitName, latitude, longitude) {
         const scannerBox = document.getElementById('scannerBox');
         scannerBox.innerHTML = `
             <div class="qr-icon"></div>
@@ -943,12 +988,17 @@ $conn->close();
         `;
         scannerBox.classList.add('active');
         
+        const body = new URLSearchParams();
+        body.append('session_id', sessionId);
+        body.append('latitude', latitude);
+        body.append('longitude', longitude);
+        
         fetch('mark_attendance.php', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
             },
-            body: 'session_id=' + sessionId
+            body: body.toString()
         })
         .then(response => response.json())
         .then(data => {
@@ -962,23 +1012,14 @@ $conn->close();
                 `;
                 scannerBox.classList.add('active');
             } else {
-                scannerBox.innerHTML = `
-                    <div class="qr-icon"></div>
-                    <h3 style="color: #e74c3c;">Check-in Failed</h3>
-                    <p>${data.message || 'Unable to mark attendance right now.'}</p>
-                    <button class="scan-btn" onclick="window.location.reload()" style="margin-top: 15px;">Try Again</button>
-                `;
-                scannerBox.classList.remove('active');
+                const feedbackMessage = data.expected_location
+                    ? `${data.message}<br><br><strong>Expected venue:</strong> ${data.expected_location}`
+                    : (data.message || 'Unable to mark attendance right now.');
+                showAttendanceFeedback('Wrong Venue', feedbackMessage, 'Try Again', `startCameraForSession(${sessionId})`, '#e74c3c');
             }
         })
         .catch(function(err) {
-            scannerBox.innerHTML = `
-                <div class="qr-icon"></div>
-                <h3 style="color: #e74c3c;">Check-in Failed</h3>
-                <p>There was a problem connecting to the attendance server.</p>
-                <button class="scan-btn" onclick="window.location.reload()" style="margin-top: 15px;">Try Again</button>
-            `;
-            scannerBox.classList.remove('active');
+            showAttendanceFeedback('Check-in Failed', 'There was a problem connecting to the attendance server.', 'Try Again', `startCameraForSession(${sessionId})`);
             console.error('Attendance submission error:', err);
         });
     }

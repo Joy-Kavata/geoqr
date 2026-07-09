@@ -100,6 +100,64 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_geofence'])) {
     exit();
 }
 
+if (isset($_GET['delete_user'])) {
+    $delete_user_id = $_GET['delete_user'];
+    
+    if ($delete_user_id == $_SESSION['user_id']) {
+        $_SESSION['message'] = "You cannot delete yourself!";
+        $_SESSION['message_type'] = "error";
+    } else {
+        $check = $conn->prepare("SELECT user_id FROM users WHERE user_id = ?");
+        $check->bind_param("i", $delete_user_id);
+        $check->execute();
+        $check_result = $check->get_result();
+        
+        if ($check_result->num_rows > 0) {
+            $delete = $conn->prepare("DELETE FROM users WHERE user_id = ?");
+            $delete->bind_param("i", $delete_user_id);
+            if ($delete->execute()) {
+                $_SESSION['message'] = "User deleted successfully!";
+                $_SESSION['message_type'] = "success";
+            } else {
+                $_SESSION['message'] = "Error deleting user: " . $delete->error;
+                $_SESSION['message_type'] = "error";
+            }
+            $delete->close();
+        } else {
+            $_SESSION['message'] = "User not found!";
+            $_SESSION['message_type'] = "error";
+        }
+        $check->close();
+    }
+    
+    header("Location: admin_dashboard.php");
+    exit();
+}
+
+if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_user_role'])) {
+    $user_id = $_POST['user_id'];
+    $role_id = $_POST['role_id'];
+
+    if ($user_id && $role_id) {
+        $stmt = $conn->prepare("UPDATE users SET role_id = ? WHERE user_id = ?");
+        $stmt->bind_param("ii", $role_id, $user_id);
+        if ($stmt->execute()) {
+            $_SESSION['message'] = "User role updated successfully!";
+            $_SESSION['message_type'] = "success";
+        } else {
+            $_SESSION['message'] = "Error updating user role: " . $stmt->error;
+            $_SESSION['message_type'] = "error";
+        }
+        $stmt->close();
+    } else {
+        $_SESSION['message'] = "Please select both a user and a role.";
+        $_SESSION['message_type'] = "error";
+    }
+
+    header("Location: admin_dashboard.php");
+    exit();
+}
+
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['enroll_student'])) {
     $user_id = $_POST['user_id'];
     $unit_id = $_POST['unit_id'];
@@ -151,9 +209,10 @@ if (isset($_GET['remove_enrollment'])) {
 
 $geofences = $conn->query("SELECT g.*, u.unit_name FROM geofences g LEFT JOIN units u ON g.unit_id = u.unit_id");
 
-
+$roles = $conn->query("SELECT role_id, role_name FROM roles ORDER BY role_id ASC");
 $units = $conn->query("SELECT unit_id, unit_name, unit_code FROM units ORDER BY unit_name ASC");
 $students = $conn->query("SELECT user_id, full_name, email FROM users WHERE role_id = 1 ORDER BY full_name ASC");
+$all_users = $conn->query("SELECT u.user_id, u.full_name, u.email, u.role_id, r.role_name FROM users u JOIN roles r ON u.role_id = r.role_id ORDER BY u.full_name ASC");
 $enrollments_query = "SELECT e.enrollment_id, e.user_id, e.unit_id, e.enrolled_at,
                       u.full_name as student_name, u.email as student_email,
                       un.unit_name, un.unit_code
@@ -184,6 +243,17 @@ if (isset($_GET['edit_id'])) {
     $edit_result = $edit_query->get_result();
     $edit_geofence = $edit_result->fetch_assoc();
     $edit_query->close();
+}
+
+$edit_user = null;
+if (isset($_GET['edit_user_id'])) {
+    $edit_user_id = $_GET['edit_user_id'];
+    $edit_user_query = $conn->prepare("SELECT u.user_id, u.full_name, u.email, u.role_id FROM users u WHERE u.user_id = ?");
+    $edit_user_query->bind_param("i", $edit_user_id);
+    $edit_user_query->execute();
+    $edit_user_result = $edit_user_query->get_result();
+    $edit_user = $edit_user_result->fetch_assoc();
+    $edit_user_query->close();
 }
 ?>
 <!DOCTYPE html>
@@ -274,7 +344,6 @@ if (isset($_GET['edit_id'])) {
             border-color: #C9A84C;
         }
         
-        /* ===== MESSAGES ===== */
         .message { 
             padding: 14px 20px; 
             border-radius: 8px; 
@@ -672,6 +741,31 @@ if (isset($_GET['edit_id'])) {
             background: #1A2A4A;
             color: #C9A84C;
         }
+
+        .role-badge {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            display: inline-block;
+            background: #e8f4fd;
+            color: #1A2A4A;
+        }
+
+        .role-badge.admin {
+            background: #e74c3c;
+            color: #ffffff;
+        }
+
+        .role-badge.lecturer {
+            background: #f39c12;
+            color: #ffffff;
+        }
+
+        .role-badge.student {
+            background: #27ae60;
+            color: #ffffff;
+        }
     </style>
 </head>
 <body>
@@ -759,6 +853,44 @@ if (isset($_GET['edit_id'])) {
                     
                     <div style="display: flex; gap: 10px; margin-top: 10px;">
                         <button type="submit" name="update_geofence" class="btn-update">Update Geofence</button>
+                        <a href="admin_dashboard.php" class="btn-cancel">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    <?php endif; ?>
+
+    <?php if ($edit_user): ?>
+        <div class="card">
+            <div class="edit-form">
+                <h3>Edit User Role</h3>
+                <form method="post">
+                    <input type="hidden" name="user_id" value="<?php echo $edit_user['user_id']; ?>">
+                    
+                    <div class="form-row">
+                        <div>
+                            <input type="text" name="full_name" value="<?php echo htmlspecialchars($edit_user['full_name']); ?>" placeholder="Full Name" readonly style="background: #f0f2f5; cursor: not-allowed;">
+                        </div>
+                        <div>
+                            <input type="email" name="email" value="<?php echo htmlspecialchars($edit_user['email']); ?>" placeholder="Email" readonly style="background: #f0f2f5; cursor: not-allowed;">
+                        </div>
+                    </div>
+                    
+                    <select name="role_id" required>
+                        <option value="">Select Role</option>
+                        <?php 
+                        $roles->data_seek(0);
+                        while ($role = $roles->fetch_assoc()): 
+                            $selected = ($role['role_id'] == $edit_user['role_id']) ? 'selected' : '';
+                        ?>
+                            <option value="<?php echo $role['role_id']; ?>" <?php echo $selected; ?>>
+                                <?php echo htmlspecialchars($role['role_name']); ?>
+                            </option>
+                        <?php endwhile; ?>
+                    </select>
+                    
+                    <div style="display: flex; gap: 10px; margin-top: 10px;">
+                        <button type="submit" name="update_user_role" class="btn-update">Update User Role</button>
                         <a href="admin_dashboard.php" class="btn-cancel">Cancel</a>
                     </div>
                 </form>
@@ -883,6 +1015,47 @@ if (isset($_GET['edit_id'])) {
         </div>
         
     </div>
+
+    <div class="card">
+        <h2>Manage Users <span class="badge"><?php echo $all_users->num_rows; ?></span></h2>
+        <?php if ($all_users->num_rows > 0): ?>
+            <table>
+                <tr>
+                    <th>User</th>
+                    <th>Email</th>
+                    <th>Current Role</th>
+                    <th>Actions</th>
+                </tr>
+                <?php $all_users->data_seek(0); while ($user_row = $all_users->fetch_assoc()): ?>
+                    <tr>
+                        <td>
+                            <span class="student-name"><?php echo htmlspecialchars($user_row['full_name']); ?></span>
+                        </td>
+                        <td><?php echo htmlspecialchars($user_row['email']); ?></td>
+                        <td>
+                            <span class="role-badge <?php echo htmlspecialchars($user_row['role_name']); ?>">
+                                <?php echo htmlspecialchars($user_row['role_name']); ?>
+                            </span>
+                        </td>
+                        <td>
+                            <a href="admin_dashboard.php?edit_user_id=<?php echo $user_row['user_id']; ?>" class="edit-link">Edit Role</a>
+                            <?php if ($user_row['user_id'] != $_SESSION['user_id']): ?>
+                                <a href="admin_dashboard.php?delete_user=<?php echo $user_row['user_id']; ?>" 
+                                   onclick="return confirm('Are you sure you want to delete user: <?php echo addslashes($user_row['full_name']); ?>? This action cannot be undone!')" 
+                                   class="delete-link">
+                                   Delete
+                                </a>
+                            <?php else: ?>
+                                <span style="color: #95a5a6; font-size: 12px; padding: 4px 12px; background: #ecf0f1; border-radius: 4px;">Current User</span>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                <?php endwhile; ?>
+            </table>
+        <?php else: ?>
+            <div class="no-data">No users found.</div>
+        <?php endif; ?>
+    </div>
     
     <div class="two-col">
         
@@ -957,13 +1130,6 @@ if (isset($_GET['edit_id'])) {
             <?php endif; ?>
         </div>
         
-    </div>
-    
-    <!-- ===== FOOTER ===== -->
-    <!--<div class="footer">
-        <span class="brand">KCA UNIVERSITY</span> • 
-        <span class="gold">GeoQR</span> • 
-        Smart Attendance Management System-->
     </div>
     
 </div>
